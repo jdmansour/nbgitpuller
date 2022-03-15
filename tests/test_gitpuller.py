@@ -324,6 +324,25 @@ def test_reset_file():
             assert puller.read_file('unicode🙂.txt') == pusher.read_file('unicode🙂.txt') == '2'
 
 
+def test_delete_modified_file():
+    with Remote() as remote, Pusher(remote) as pusher:
+        pusher.push_file('README.md', 'hello')
+
+        with Puller(remote) as puller:
+            # Change a file locally
+            puller.write_file('README.md', 'student changed')
+
+            # Sync will keep the local change
+            puller.pull_all()            
+            assert puller.read_file('README.md') == 'student changed'
+
+            # Delete previously changed file
+            os.remove(os.path.join(puller.path, 'README.md'))
+
+            pusher.push_file('new_file.txt', 'hello world')
+            puller.pull_all()
+
+
 @pytest.fixture(scope='module')
 def long_remote():
     with Remote("long_remote") as remote, Pusher(remote, "lr_pusher") as pusher:
