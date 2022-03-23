@@ -37,6 +37,12 @@ class Repository:
             stderr=sp.STDOUT
         ).decode().strip()
 
+    def cmd(self, *args):
+        """ Runs a command in the repository and prints the output. """
+        print('{}: $ {}'.format(self.path, ' '.join(args)))
+        lines = sp.check_output(list(args), cwd=self.path, stderr=sp.STDOUT).decode().splitlines()
+        for line in lines:
+            print('{}: {}'.format(self.path, line.rstrip()))
 
 class Remote(Repository):
     pass
@@ -371,6 +377,31 @@ def test_delete_conflicted_file():
 
             # Make a change remotely.  We should be able to pull it
             pusher.push_file('new_file.txt', 'hello world')
+            puller.pull_all()
+
+
+def test_diverged():
+    """
+    Test that we can update when branches have diverged,
+    with the remote file deleted and the local file edited.
+    """
+    with Remote() as remote, Pusher(remote) as pusher:
+        pusher.push_file('README.md', 'new')
+
+        with Puller(remote) as puller:
+            # Delete the file remotely
+            pusher.git('rm', 'README.md')
+            pusher.git('commit', '-m', 'Deleted file')
+            pusher.git('push', '-u', 'origin', 'master')
+
+            # Edit locally
+            puller.write_file('README.md', 'conflict')
+            puller.git('add', 'README.md')
+            puller.git('commit', '-m', 'Make conflicting change')
+
+            puller.git('fetch')
+            puller.cmd('git', '-c', 'color.ui=always', 'log', '--all', '--decorate', '--oneline', '--graph')
+
             puller.pull_all()
 
 
